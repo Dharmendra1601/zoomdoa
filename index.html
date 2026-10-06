@@ -1,0 +1,901 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Zoom Registration Checker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+/* Layout: two-panel upload → auto-process → download result */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --border: #e2e5eb;
+  --fg: #1a1d23;
+  --fg-muted: #6b7280;
+  --accent: #2563eb;
+  --accent-light: #eff4ff;
+  --accent-hover: #1d4ed8;
+  --success: #16a34a;
+  --success-light: #f0fdf4;
+  --warning: #d97706;
+  --warning-light: #fffbeb;
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.10);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2d3141;
+    --fg: #f0f2f7;
+    --fg-muted: #8b93a9;
+    --accent: #3b82f6;
+    --accent-light: #1e2a45;
+    --accent-hover: #60a5fa;
+    --success: #22c55e;
+    --success-light: #0d2218;
+    --warning: #f59e0b;
+    --warning-light: #2a1f0a;
+    --danger: #ef4444;
+    --danger-light: #2a0f0f;
+    --shadow: 0 1px 3px rgba(0,0,0,.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --border: #2d3141;
+  --fg: #f0f2f7;
+  --fg-muted: #8b93a9;
+  --accent: #3b82f6;
+  --accent-light: #1e2a45;
+  --accent-hover: #60a5fa;
+  --success: #22c55e;
+  --success-light: #0d2218;
+  --warning: #f59e0b;
+  --warning-light: #2a1f0a;
+  --danger: #ef4444;
+  --danger-light: #2a0f0f;
+  --shadow: 0 1px 3px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  padding-inline: 16px;
+  padding-block: 32px;
+}
+
+.app {
+  max-width: 860px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Header */
+.header {
+  text-align: center;
+}
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+.header h1 {
+  font-size: clamp(22px, 4vw, 32px);
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+.header p {
+  color: var(--fg-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 540px;
+  margin-inline: auto;
+}
+
+/* Steps indicator */
+.steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  font-size: 13px;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+}
+.step.active { color: var(--accent); }
+.step.done { color: var(--success); }
+.step-num {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--fg-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  flex-shrink: 0;
+  transition: all .2s;
+}
+.step.active .step-num { background: var(--accent); color: #fff; }
+.step.done .step-num { background: var(--success); color: #fff; }
+.step-line {
+  width: 40px; height: 1px;
+  background: var(--border);
+  margin-inline: 6px;
+}
+@media (max-width: 480px) { .step-label { display: none; } .step-line { width: 20px; } }
+
+/* Upload cards */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 560px) { .upload-grid { grid-template-columns: 1fr; } }
+
+.upload-card {
+  background: var(--surface);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative;
+  text-align: center;
+}
+.upload-card:hover, .upload-card.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.upload-card.has-file {
+  border-style: solid;
+  border-color: var(--success);
+  background: var(--success-light);
+}
+.upload-card input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.upload-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 12px;
+  font-size: 20px;
+}
+.upload-card.has-file .upload-icon {
+  background: var(--success-light);
+  color: var(--success);
+}
+.upload-card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.upload-card p {
+  font-size: 12px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+.file-name {
+  margin-top: 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--success);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* Column mapper */
+.mapper-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.mapper-card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.mapper-card > p {
+  font-size: 13px;
+  color: var(--fg-muted);
+  margin-bottom: 20px;
+}
+.mapper-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 24px;
+}
+@media (max-width: 560px) { .mapper-grid { grid-template-columns: 1fr; } }
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.field-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.field-group select {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  appearance: auto;
+}
+.field-group select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+/* Process button */
+.process-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+  box-shadow: var(--shadow-md);
+}
+.process-btn:hover:not(:disabled) { background: var(--accent-hover); }
+.process-btn:active:not(:disabled) { transform: scale(.98); }
+.process-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Results */
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.result-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.result-header h2 { font-size: 16px; font-weight: 600; }
+.stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.stat-chip.total { background: var(--accent-light); color: var(--accent); }
+.stat-chip.registered { background: var(--success-light); color: var(--success); }
+.stat-chip.not-registered { background: var(--danger-light); color: var(--danger); }
+
+.result-actions {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.download-btn:hover { opacity: .88; }
+.filter-btns {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.filter-btn {
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+/* Table */
+.table-wrap {
+  overflow-x: auto;
+  max-height: 420px;
+  overflow-y: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 480px;
+}
+thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-badge.yes { background: var(--success-light); color: var(--success); }
+.status-badge.no  { background: var(--danger-light); color: var(--danger); }
+
+/* Alert */
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.alert.error { background: var(--danger-light); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+.alert.info  { background: var(--accent-light); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* Spinner */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+[hidden] { display: none !important; }
+</style>
+
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">
+      <span>📋</span> Zoom Webinar Tool
+    </div>
+    <h1>Registration Checker</h1>
+    <p>Upload your customer data file and Zoom registration report. The tool will automatically find who registered and who didn't.</p>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="steps" id="steps">
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      <span class="step-label">Upload Files</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      <span class="step-label">Map Columns</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      <span class="step-label">Get Results</span>
+    </div>
+  </div>
+
+  <!-- Error alert -->
+  <div class="alert error" id="errorBox" hidden></div>
+
+  <!-- Upload section -->
+  <div class="upload-grid">
+    <!-- Customer file -->
+    <div class="upload-card" id="customerCard">
+      <input type="file" id="customerFile" accept=".xlsx,.xls,.csv">
+      <div class="upload-icon" id="customerIcon">📁</div>
+      <h3>Customer Data File</h3>
+      <p>Your main customer list with names, phone & email</p>
+      <div class="file-name" id="customerFileName" hidden></div>
+    </div>
+
+    <!-- Zoom file -->
+    <div class="upload-card" id="zoomCard">
+      <input type="file" id="zoomFile" accept=".xlsx,.xls,.csv">
+      <div class="upload-icon" id="zoomIcon">🎥</div>
+      <h3>Zoom Registration Report</h3>
+      <p>Raw file downloaded from Zoom (any format)</p>
+      <div class="file-name" id="zoomFileName" hidden></div>
+    </div>
+  </div>
+
+  <!-- Column mapper -->
+  <div class="mapper-card" id="mapperSection" hidden>
+    <h2>Match your columns</h2>
+    <p>Tell us which columns contain phone and email in your Customer Data file. The tool will auto-detect, but verify below.</p>
+    <div class="mapper-grid">
+      <div class="field-group">
+        <label>📞 Phone column (Customer file)</label>
+        <select id="customerPhone"></select>
+        <span class="field-hint">10-digit mobile numbers</span>
+      </div>
+      <div class="field-group">
+        <label>✉️ Email column (Customer file)</label>
+        <select id="customerEmail"></select>
+        <span class="field-hint">Email addresses of customers</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Process button -->
+  <button class="process-btn" id="processBtn" disabled>
+    <span>Upload both files to continue</span>
+  </button>
+
+  <!-- Result -->
+  <div class="result-card" id="resultCard" hidden>
+    <div class="result-header">
+      <h2>Results</h2>
+      <div class="stats-row">
+        <div class="stat-chip total">Total: <span id="statTotal">0</span></div>
+        <div class="stat-chip registered">✓ Registered: <span id="statReg">0</span></div>
+        <div class="stat-chip not-registered">✗ Not Registered: <span id="statNot">0</span></div>
+      </div>
+    </div>
+    <div class="result-actions">
+      <button class="download-btn" id="downloadBtn">⬇ Download Result (.csv)</button>
+      <div class="filter-btns">
+        <button class="filter-btn active" id="filterAll" onclick="applyFilter('all')">All</button>
+        <button class="filter-btn" id="filterYes" onclick="applyFilter('yes')">Registered</button>
+        <button class="filter-btn" id="filterNo" onclick="applyFilter('no')">Not Registered</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="resultTable">
+        <thead id="resultHead"></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let customerData = null;   // { headers:[], rows:[][] }
+let zoomData     = null;
+let resultRows   = null;   // [{...originalRow, Registered_on_Zoom}]
+let resultHeaders = null;
+let currentFilter = 'all';
+
+// ─── File upload handling ─────────────────────────────────────────────────────
+function setupDrop(cardId, inputId, slot) {
+  const card  = document.getElementById(cardId);
+  const input = document.getElementById(inputId);
+  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', e => {
+    e.preventDefault(); card.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f, slot);
+  });
+  input.addEventListener('change', () => { if (input.files[0]) handleFile(input.files[0], slot); });
+}
+setupDrop('customerCard','customerFile','customer');
+setupDrop('zoomCard','zoomFile','zoom');
+
+async function handleFile(file, slot) {
+  showError('');
+  try {
+    const parsed = await parseFile(file);
+    if (slot === 'customer') {
+      customerData = parsed;
+      markCard('customerCard','customerIcon','customerFileName', file.name);
+      populateColumnSelects(parsed.headers);
+    } else {
+      zoomData = parsed;
+      markCard('zoomCard','zoomIcon','zoomFileName', file.name);
+    }
+    checkReady();
+  } catch(e) {
+    showError('Could not read file: ' + e.message);
+  }
+}
+
+function markCard(cardId, iconId, nameId, fname) {
+  document.getElementById(cardId).classList.add('has-file');
+  document.getElementById(iconId).textContent = '✅';
+  const nameEl = document.getElementById(nameId);
+  nameEl.textContent = fname;
+  nameEl.hidden = false;
+}
+
+// ─── Parse any supported file ─────────────────────────────────────────────────
+function parseFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('File read failed'));
+    reader.onload = e => {
+      try {
+        const ab = e.target.result;
+        const wb = XLSX.read(ab, { type: 'array', raw: false });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        // Find actual header row (skip blank/meta rows at top)
+        const rawAoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const headerRowIdx = findHeaderRow(rawAoa);
+        if (headerRowIdx === -1) { reject(new Error('Could not find header row')); return; }
+        const headers = rawAoa[headerRowIdx].map(h => String(h).trim());
+        const rows = rawAoa.slice(headerRowIdx + 1).filter(r => r.some(c => c !== '' && c !== null && c !== undefined));
+        resolve({ headers, rows });
+      } catch(err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Find the first row that looks like a header (has text in most cells)
+function findHeaderRow(aoa) {
+  for (let i = 0; i < Math.min(10, aoa.length); i++) {
+    const row = aoa[i];
+    const textCells = row.filter(c => c && isNaN(Number(c)) && String(c).trim().length > 0);
+    if (textCells.length >= 2) return i;
+  }
+  return 0;
+}
+
+// ─── Column selects ───────────────────────────────────────────────────────────
+function populateColumnSelects(headers) {
+  const phoneEl = document.getElementById('customerPhone');
+  const emailEl = document.getElementById('customerEmail');
+  phoneEl.innerHTML = '';
+  emailEl.innerHTML = '';
+
+  // Add a blank option
+  const blank = () => { const o = document.createElement('option'); o.value = ''; o.textContent = '— select —'; return o; };
+  phoneEl.appendChild(blank());
+  emailEl.appendChild(blank());
+
+  headers.forEach((h, i) => {
+    const makeOpt = () => { const o = document.createElement('option'); o.value = i; o.textContent = h; return o; };
+    phoneEl.appendChild(makeOpt());
+    emailEl.appendChild(makeOpt());
+  });
+
+  // Auto-detect
+  const phoneIdx = headers.findIndex(h => /phone|mobile|contact|ph\b|cell/i.test(h));
+  const emailIdx = headers.findIndex(h => /email|e-mail|mail/i.test(h));
+  if (phoneIdx >= 0) phoneEl.value = phoneIdx;
+  if (emailIdx >= 0) emailEl.value = emailIdx;
+
+  document.getElementById('mapperSection').hidden = false;
+}
+
+// ─── Ready state ──────────────────────────────────────────────────────────────
+function checkReady() {
+  const ready = customerData && zoomData;
+  const btn = document.getElementById('processBtn');
+  if (ready) {
+    btn.disabled = false;
+    btn.querySelector('span').textContent = 'Find Who Registered →';
+    setStep(2);
+  }
+}
+
+// ─── Process ──────────────────────────────────────────────────────────────────
+document.getElementById('processBtn').addEventListener('click', () => {
+  try {
+    process();
+  } catch(e) {
+    showError(e.message);
+  }
+});
+
+function process() {
+  showError('');
+  const btn = document.getElementById('processBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span><span>Processing…</span>';
+
+  setTimeout(() => { // let UI update
+    try {
+      const phoneColIdx = parseInt(document.getElementById('customerPhone').value);
+      const emailColIdx = parseInt(document.getElementById('customerEmail').value);
+
+      if (isNaN(phoneColIdx) && isNaN(emailColIdx)) {
+        throw new Error('Please select at least one column (phone or email) from your customer file.');
+      }
+
+      // Build Zoom lookup sets
+      const { zoomPhones, zoomEmails } = buildZoomLookups(zoomData);
+
+      // Process each customer row
+      resultHeaders = [...customerData.headers, 'Registered_on_Zoom'];
+      resultRows = customerData.rows.map(row => {
+        const phone = !isNaN(phoneColIdx) ? cleanPhone(String(row[phoneColIdx] || '')) : '';
+        const email = !isNaN(emailColIdx) ? String(row[emailColIdx] || '').trim().toLowerCase() : '';
+
+        let matched = false;
+        if (phone && zoomPhones.has(phone)) matched = true;
+        if (!matched && email && zoomEmails.has(email)) matched = true;
+
+        return [...row, matched ? 'Yes' : 'No'];
+      });
+
+      const total = resultRows.length;
+      const regCount = resultRows.filter(r => r[r.length-1] === 'Yes').length;
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statReg').textContent   = regCount;
+      document.getElementById('statNot').textContent   = total - regCount;
+
+      renderTable('all');
+      document.getElementById('resultCard').hidden = false;
+      document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setStep(3);
+
+      btn.innerHTML = '<span>✓ Done — run again</span>';
+      btn.disabled = false;
+    } catch(e) {
+      showError(e.message);
+      btn.innerHTML = '<span>Find Who Registered →</span>';
+      btn.disabled = false;
+    }
+  }, 50);
+}
+
+// ─── Build Zoom lookup sets ───────────────────────────────────────────────────
+function buildZoomLookups(zd) {
+  const zoomPhones = new Set();
+  const zoomEmails = new Set();
+
+  // Find phone/email columns in Zoom data
+  const zh = zd.headers;
+  const phoneCol = zh.findIndex(h => /phone|mobile|contact/i.test(h));
+  const emailCol = zh.findIndex(h => /email|e-mail|mail/i.test(h));
+
+  zd.rows.forEach(row => {
+    // Email
+    if (emailCol >= 0) {
+      const e = String(row[emailCol] || '').trim().toLowerCase();
+      if (e) zoomEmails.add(e);
+    }
+
+    // Phone — only rows that have a REAL phone (not blank → means they actually registered)
+    if (phoneCol >= 0) {
+      const raw = String(row[phoneCol] || '').trim();
+      if (raw) {
+        const cleaned = cleanPhone(raw);
+        if (cleaned) zoomPhones.add(cleaned);
+      }
+    }
+
+    // Also scan ALL columns for anything that looks like an email or phone
+    // (handles cases where Zoom file has different column names)
+    row.forEach((cell, i) => {
+      const s = String(cell || '').trim();
+      if (!s) return;
+      // Email pattern
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) {
+        zoomEmails.add(s.toLowerCase());
+      }
+      // Phone pattern — if it looks like digits ≥ 10
+      const digits = s.replace(/\D/g, '');
+      if (digits.length >= 10 && i !== emailCol) {
+        zoomPhones.add(digits.slice(-10));
+      }
+    });
+  });
+
+  return { zoomPhones, zoomEmails };
+}
+
+// ─── Clean phone ──────────────────────────────────────────────────────────────
+function cleanPhone(raw) {
+  // Remove all non-digits
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return '';
+  // Take last 10 digits (strips country code like 91)
+  return digits.slice(-10);
+}
+
+// ─── Table render ─────────────────────────────────────────────────────────────
+function renderTable(filter) {
+  currentFilter = filter;
+  const head = document.getElementById('resultHead');
+  const body = document.getElementById('resultBody');
+
+  // Filter buttons
+  ['All','Yes','No'].forEach(f => {
+    document.getElementById('filter' + (f === 'Yes' ? 'Yes' : f === 'No' ? 'No' : 'All'))
+      .classList.toggle('active', filter === f.toLowerCase());
+  });
+
+  // Show max 8 columns to avoid overflow
+  const totalCols = resultHeaders.length;
+  const statusIdx = totalCols - 1;
+  // Always show: first col (name usually), phone col, email col, status col; fill rest from start
+  const shown = getShownCols(statusIdx, totalCols);
+
+  // Header
+  head.innerHTML = '<tr>' + shown.map(i => `<th>${resultHeaders[i]}</th>`).join('') + '</tr>';
+
+  // Rows
+  const filtered = filter === 'all' ? resultRows :
+    resultRows.filter(r => r[statusIdx].toLowerCase() === filter);
+
+  body.innerHTML = filtered.slice(0, 500).map(row => {
+    const status = row[statusIdx];
+    const badge = `<span class="status-badge ${status === 'Yes' ? 'yes' : 'no'}">${status === 'Yes' ? '✓ Yes' : '✗ No'}</span>`;
+    return '<tr>' + shown.map(i =>
+      i === statusIdx ? `<td>${badge}</td>` : `<td title="${escHtml(row[i])}">${escHtml(row[i])}</td>`
+    ).join('') + '</tr>';
+  }).join('');
+
+  if (filtered.length > 500) {
+    body.innerHTML += `<tr><td colspan="${shown.length}" style="text-align:center;color:var(--fg-muted);padding:16px">
+      Showing first 500 of ${filtered.length} rows. Download CSV for full data.</td></tr>`;
+  }
+}
+
+function getShownCols(statusIdx, total) {
+  const MAX = 7;
+  if (total <= MAX + 1) return Array.from({length: total}, (_,i) => i);
+  // Always include status; take first (MAX) other cols
+  const cols = Array.from({length: Math.min(MAX, total-1)}, (_,i) => i);
+  cols.push(statusIdx);
+  return cols;
+}
+
+function applyFilter(f) { renderTable(f); }
+
+// ─── Download ─────────────────────────────────────────────────────────────────
+let downloadsApi = null;
+claude.use('downloads').then(d => { downloadsApi = d; }).catch(() => {});
+
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  const csv = [
+    resultHeaders.map(csvCell).join(','),
+    ...resultRows.map(row => row.map(csvCell).join(','))
+  ].join('\n');
+
+  if (downloadsApi) {
+    try {
+      await downloadsApi.save({ filename: 'zoom_registration_result.csv', data: csv });
+      return;
+    } catch(e) { /* fall through */ }
+  }
+  // Fallback for local / non-viewer context
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'zoom_registration_result.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return s.includes(',') || s.includes('"') || s.includes('\n')
+    ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  if (!msg) { box.hidden = true; return; }
+  box.textContent = '⚠ ' + msg;
+  box.hidden = false;
+}
+
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('step'+i);
+    el.classList.toggle('active', i === n);
+    el.classList.toggle('done', i < n);
+  });
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+</body></html>
